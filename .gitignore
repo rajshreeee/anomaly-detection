@@ -1,0 +1,45 @@
+# --- OS Files ---
+.DS_Store
+Thumbs.db
+
+# --- Python & Environments ---
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+
+# (Optional) If you want to keep environment.yml in git, comment out the line above
+
+# --- Project Specifics ---
+# Do NOT track the raw data
+data/
+
+
+# --- Build & Distribution ---
+# Since you're using pip install -e .
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- Logging & MLOps ---
+mlruns/
+lightning_logs/
+*.log
