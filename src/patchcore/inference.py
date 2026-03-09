@@ -45,7 +45,7 @@ def _extract_features(
     layer_patches, ref_shape = [], None
 
     for layer_name in PC_LAYERS:
-        f = feat_map[layer_name].cpu()
+        f = feat_map[layer_name]
         patches, shape = patchify(f, PC_PATCH_SIZE)
 
         if ref_shape is None:
@@ -69,7 +69,7 @@ def _extract_features(
         combined.reshape(-1, D).unsqueeze(1).expand(-1, 1, -1), PC_TARGET_DIM
     ).squeeze(1)                                 
 
-    return final.numpy().astype(np.float32), ref_shape
+    return final.cpu().numpy().astype(np.float32), ref_shape
 
 
 def _score_map(

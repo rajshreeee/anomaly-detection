@@ -49,10 +49,6 @@ def _save_per_class_table(ead: dict, pc: dict, out_dir: Path) -> pd.DataFrame:
     logger.info("Saved per_class_image_auroc.csv / .txt")
     return df
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Plots
-# ──────────────────────────────────────────────────────────────────────────────
-
 _COLORS = {"EfficientAD": "#4C72B0", "PatchCore": "#DD8452"}
 
 
@@ -79,18 +75,16 @@ def _grouped_bar(
     plt.close(fig)
     logger.info(f"Saved {path.name}")
 
-
 def _plot_anomaly_maps(ead: dict, pc: dict, out_dir: Path, n: int = 6) -> None:
     anomaly_idx = [i for i, y in enumerate(ead["y_true"]) if y == 1][:n]
     if not anomaly_idx:
         logger.warning("No anomalous samples found — skipping anomaly_maps.png")
         return
 
-    cols = len(anomaly_idx)
-    fig, axes = plt.subplots(3, cols, figsize=(3 * cols, 9))
-    # ensure axes is always 2-D
-    if cols == 1:
-        axes = np.expand_dims(axes, axis=1)
+    num_samples = len(anomaly_idx)
+    fig, axes = plt.subplots(3, num_samples + 1, 
+                             figsize=(3 * (num_samples + 1), 9),
+                             gridspec_kw={'width_ratios': [0.5] + [1] * num_samples})
 
     row_labels = ["GT Mask", "EfficientAD", "PatchCore"]
     data_rows  = [
@@ -99,25 +93,28 @@ def _plot_anomaly_maps(ead: dict, pc: dict, out_dir: Path, n: int = 6) -> None:
         [pc["maps"][i]   for i in anomaly_idx],
     ]
 
-    for r, (label, row) in enumerate(zip(row_labels, data_rows)):
-        for c, img in enumerate(row):
-            ax = axes[r][c]
-            ax.imshow(img, cmap="hot", interpolation="nearest")
+    for r, (label, row_data) in enumerate(zip(row_labels, data_rows)):
+        ax_label = axes[r, 0]
+        ax_label.text(0.5, 0.5, label, fontsize=14, fontweight='bold', 
+                      ha='center', va='center', rotation=0)
+        ax_label.axis("off")
+
+        for c, img in enumerate(row_data):
+            ax = axes[r, c + 1]
+            cmap = "gray" if r == 0 else "jet"
+            im = ax.imshow(img, cmap=cmap, interpolation="nearest")
             ax.axis("off")
-            if c == 0:
-                ax.set_ylabel(label, fontsize=10)
+            
             if r == 0:
-                ax.set_title(ead["classes"][anomaly_idx[c]], fontsize=9)
+                class_name = ead["classes"][anomaly_idx[c]]
+                ax.set_title(f"Sample {anomaly_idx[c]}\n({class_name})", fontsize=10)
 
-    fig.suptitle("Anomaly Maps: GT Mask · EfficientAD · PatchCore", fontsize=13)
-    fig.tight_layout()
-    fig.savefig(out_dir / "anomaly_maps.png", dpi=150)
+    fig.suptitle("Anomaly Localization Comparison", fontsize=16, y=0.98)
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    fig.savefig(out_dir / "anomaly_maps.png", dpi=150, bbox_inches='tight')
     plt.close(fig)
-    logger.info("Saved anomaly_maps.png")
+    logger.info("Saved anomaly_maps.png with clear row labels")
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Entry point
-# ──────────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(name)s — %(message)s")
@@ -142,7 +139,6 @@ def main() -> None:
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── Inference ─────────────────────────────────────────────────────────────
     logger.info("Running EfficientAD inference …")
     ead_res = run_ead(
         test_dataset_path=args.test_path,
@@ -158,11 +154,9 @@ def main() -> None:
         device=args.device,
     )
 
-    # ── Tables ────────────────────────────────────────────────────────────────
     df_summary = _save_summary_table(ead_res, pc_res, out_dir)
     df_cls     = _save_per_class_table(ead_res, pc_res, out_dir)
 
-    # ── Plots ─────────────────────────────────────────────────────────────────
     _grouped_bar(
         df_summary,
         title="EfficientAD vs PatchCore — Overall Metrics",
