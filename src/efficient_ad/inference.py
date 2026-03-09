@@ -1,10 +1,8 @@
-# src/efficientad/inference.py
 
 import logging
 from pathlib import Path
 
 import numpy as np
-import scipy.ndimage
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -36,10 +34,6 @@ EAD_AUTOENCODER_PATH = config.EAD_AUTOENCODER_PATH
 EAD_STATS_PATH = config.EAD_STATS_PATH
 
 def _load_models(device: str):
-    """
-    Load teacher, student, autoencoder and normalization stats from output dir.
-    Teacher weights always come from the pretrained path in config.
-    """
     teacher     = load_teacher(EAD_TEACHER_PATH, EAD_OUT_CHANNELS, device)
     student     = get_pdn_small(2 * EAD_OUT_CHANNELS).to(device)
     autoencoder = get_autoencoder(EAD_OUT_CHANNELS).to(device)
@@ -59,7 +53,9 @@ def _load_models(device: str):
     q_ae_start  = stats['q_ae_start']
     q_ae_end    = stats['q_ae_end']
 
-    teacher.eval(); student.eval(); autoencoder.eval()
+    teacher.eval()
+    student.eval() 
+    autoencoder.eval()
 
     return teacher, student, autoencoder, t_mean, t_std, \
            q_st_start, q_st_end, q_ae_start, q_ae_end
@@ -78,74 +74,45 @@ def _get_anomaly_map(
     q_ae_end:    torch.Tensor,
     device:      str,
 ) -> np.ndarray:
-    """
-    Run one image through EfficientAD and return [EVAL_SIZE, EVAL_SIZE] anomaly map.
-
-    Steps:
-      1. Resize image to EAD_IMAGE_SIZE (256) — model's expected input
-      2. Forward pass → combined ST + AE anomaly map
-      3. Pad edges (teacher PDN loses border pixels due to no-padding conv)
-      4. Upsample to EVAL_SIZE (224) for fair comparison with masks
-    """
     img_ead = F.interpolate(
         img.to(device),
         size=(EAD_IMAGE_SIZE, EAD_IMAGE_SIZE),
         mode='bilinear', align_corners=False
-    )                                                    # [1, 3, 256, 256]
+    )                                                  
 
     amap = predict_map(
         img_ead, teacher, student, autoencoder,
         t_mean, t_std, EAD_OUT_CHANNELS,
         q_st_start, q_st_end, q_ae_start, q_ae_end
-    )                                                    # [1, 1, ~56, ~56]
+    )                                                    
 
-    amap = F.pad(amap, (4, 4, 4, 4))                    # restore border lost by PDN convs
+    amap = F.pad(amap, (4, 4, 4, 4))                    
     amap = F.interpolate(amap, size=(EAD_IMAGE_SIZE, EAD_IMAGE_SIZE),
                          mode='bilinear', align_corners=False)
-    return amap.squeeze().cpu().numpy()                  # [EVAL_SIZE, EVAL_SIZE]
-
+    return amap.squeeze().cpu().numpy()                  
 
 def run_inference(
     test_dataset_path: str,
     mask_dataset_path: str,
     device:            str = 'cuda',
 ) -> dict:
-    """
-    Full EfficientAD inference + evaluation pipeline.
-
-    Args:
-        test_dataset_path : path to carpet/test/
-        mask_dataset_path : path to carpet/ground_truth/
-        ckpt_dir          : directory containing student_final.pth,
-                            autoencoder_final.pth, stats.pth
-        device            : 'cuda' or 'cpu'
-
-    Returns:
-        dict with keys: scores, maps, masks, y_true, classes,
-                        image_auroc, full_pixel_auroc, anomaly_pixel_auroc,
-                        per_class_auroc
-    """
-    # ── Data ──
-    # Load test images at EVAL_SIZE — resized to EAD_IMAGE_SIZE inside _get_anomaly_map
     test_ds = TestDataset(test_dataset_path, image_size=EAD_IMAGE_SIZE)
     mask_ds = MaskDataset(test_ds, mask_dataset_path, image_size=EAD_IMAGE_SIZE)
     loader  = DataLoader(test_ds, batch_size=1, shuffle=False, num_workers=2)
     logger.info(f"Test set: {len(test_ds)} images | Classes: {test_ds.classes}")
 
-    # ── Models ──
     (teacher, student, autoencoder,
      t_mean, t_std,
      q_st_start, q_st_end,
      q_ae_start, q_ae_end) = _load_models(device)
 
-    # ── Inference ──
     scores, maps, masks_np, y_true, classes = [], [], [], [], []
 
     with torch.no_grad():
         for i, (img, label, path) in enumerate(tqdm(loader, desc='EfficientAD inference')):
             y_true.append(label.item())
             classes.append(Path(path[0]).parent.name)
-            masks_np.append(mask_ds[i].squeeze().numpy())    # [H, W]
+            masks_np.append(mask_ds[i].squeeze().numpy())   
 
             amap = _get_anomaly_map(
                 img, teacher, student, autoencoder,
@@ -159,7 +126,6 @@ def run_inference(
 
     logger.info("Inference complete")
 
-    # ── Metrics ──
     img_auc        = image_auroc(y_true, scores)
     full_px_auc    = pixel_auroc(masks_np, maps)
     anomaly_px_auc = pixel_auroc_anomalous_only(masks_np, maps)

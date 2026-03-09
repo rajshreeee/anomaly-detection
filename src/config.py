@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 
 # --- DIRECTORY LOGIC ---
-# Automatically finds the project root regardless of where you run the script
 BASE_DIR = Path(__file__).parent.parent.absolute()
 
 # --- COMMON SETTINGS ---

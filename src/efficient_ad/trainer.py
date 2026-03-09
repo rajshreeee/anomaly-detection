@@ -1,5 +1,3 @@
-# src/efficientad/trainer.py
-
 import logging
 import torch
 import torch.nn as nn
@@ -14,11 +12,6 @@ def teacher_normalization(
     loader,
     device: str,
 ) -> tuple:
-    """
-    Compute channel-wise mean and std of teacher outputs over the training set.
-    Used to standardize teacher features before computing ST loss.
-    Must be computed AFTER loading teacher weights and BEFORE training.
-    """
     means = []
     for img, _ in tqdm(loader, desc='Teacher mean'):
         out = teacher(img.to(device))
@@ -46,11 +39,6 @@ def map_normalization(
     out_channels: int,
     device:      str,
 ) -> tuple:
-    """
-    Compute quantile bounds of ST and AE anomaly maps over the validation set.
-    These bounds are used to scale raw anomaly scores to a comparable range
-    during inference, so ST and AE maps contribute equally to the final score.
-    """
     maps_st, maps_ae = [], []
 
     for img, _ in tqdm(val_loader, desc='Map normalization'):
@@ -88,18 +76,6 @@ def train_one_step(
     out_channels: int,
     optimizer:    torch.optim.Optimizer,
 ) -> float:
-    """
-    Single training step for student + autoencoder.
-
-    Three losses:
-      loss_st   — student mimics teacher on img_st (hard example mining via 99.9th percentile)
-      loss_ae   — autoencoder reconstructs teacher features on img_ae
-      loss_stae — student's AE channels mimic autoencoder output (ties them together)
-
-    Teacher is always frozen — no gradients flow through it.
-
-    Returns total loss as float for logging.
-    """
     with torch.no_grad():
         t_out = (teacher(img_st) - t_mean) / t_std
 

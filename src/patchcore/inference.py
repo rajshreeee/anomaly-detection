@@ -1,5 +1,3 @@
-# src/patchcore/inference.py
-
 import logging
 from pathlib import Path
 
@@ -42,10 +40,6 @@ def _extract_features(
     extractor: FeatureExtractor,
     device:    str,
 ) -> np.ndarray:
-    """
-    Extract, aggregate and project patch features from one image.
-    Returns [N_patches, PC_TARGET_DIM] float32 numpy array.
-    """
     B         = img.shape[0]
     feat_map  = extractor(img.to(device))
     layer_patches, ref_shape = [], None
@@ -69,11 +63,11 @@ def _extract_features(
         ).squeeze(1)
         layer_patches.append(proj.reshape(B, N, PC_PRETRAIN_DIM))
 
-    combined = torch.cat(layer_patches, dim=-1)          # [B, N, PRETRAIN_DIM * n_layers]
+    combined = torch.cat(layer_patches, dim=-1)  
     B, N, D  = combined.shape
     final    = F.adaptive_avg_pool1d(
         combined.reshape(-1, D).unsqueeze(1).expand(-1, 1, -1), PC_TARGET_DIM
-    ).squeeze(1)                                         # [B*N, TARGET_DIM]
+    ).squeeze(1)                                 
 
     return final.numpy().astype(np.float32), ref_shape
 
@@ -84,13 +78,9 @@ def _score_map(
     eval_size:  int,
     gaussian_sigma: float = 4.0,
 ) -> np.ndarray:
-    """
-    Reshape patch distances into a spatial map, upsample and smooth.
-    Returns [eval_size, eval_size] float32 numpy array.
-    """
     score_map = torch.from_numpy(
         distances[:, 0].reshape(ref_shape[0], ref_shape[1])
-    ).unsqueeze(0).unsqueeze(0)                          # [1, 1, H, W]
+    ).unsqueeze(0).unsqueeze(0)    
 
     score_map = F.interpolate(score_map, size=(eval_size, eval_size),
                                mode='bilinear', align_corners=False)
@@ -106,47 +96,29 @@ def run_inference(
     index_path:        str,
     device:            str = 'cuda',
 ) -> dict:
-    """
-    Full PatchCore inference + evaluation pipeline.
-
-    Args:
-        test_dataset_path : path to carpet/test/
-        mask_dataset_path : path to carpet/ground_truth/
-        index_path        : path to saved .faiss index
-        device            : 'cuda' or 'cpu'
-
-    Returns:
-        dict with keys: scores, maps, masks, y_true, classes,
-                        image_auroc, full_pixel_auroc, anomaly_pixel_auroc,
-                        per_class_auroc
-    """
-    # ── Data ──
     test_ds = TestDataset(test_dataset_path, image_size=PC_IMAGE_SIZE)
     mask_ds = MaskDataset(test_ds, mask_dataset_path, image_size=PC_IMAGE_SIZE)
     loader  = DataLoader(test_ds, batch_size=1, shuffle=False, num_workers=2)
     logger.info(f"Test set: {len(test_ds)} images | Classes: {test_ds.classes}")
 
-    # ── Load FAISS index ──
     index = faiss.read_index(index_path)
     if device == 'cuda' and faiss.get_num_gpus() > 0:
         res   = faiss.StandardGpuResources()
         index = faiss.index_cpu_to_gpu(res, 0, index)
     logger.info(f"Memory bank: {index.ntotal} vectors")
 
-    # ── Model ──
     extractor = FeatureExtractor(layers=PC_LAYERS, device=device)
 
-    # ── Inference ──
     scores, maps, masks_np, y_true, classes = [], [], [], [], []
 
     with torch.no_grad():
         for i, (img, label, path) in enumerate(tqdm(loader, desc='PatchCore inference')):
             y_true.append(label.item())
             classes.append(Path(path[0]).parent.name)
-            masks_np.append(mask_ds[i].squeeze().numpy())   # [H, W]
+            masks_np.append(mask_ds[i].squeeze().numpy()) 
 
             features, ref_shape = _extract_features(img, extractor, device)
-            dists, _            = index.search(features, 1)  # [N_patches, 1]
+            dists, _            = index.search(features, 1) 
 
             amap = _score_map(dists, ref_shape, PC_IMAGE_SIZE)
             maps.append(amap)
@@ -154,7 +126,6 @@ def run_inference(
 
     logger.info("Inference complete")
 
-    # ── Metrics ──
     img_auc         = image_auroc(y_true, scores)
     full_px_auc     = pixel_auroc(masks_np, maps)
     anomaly_px_auc  = pixel_auroc_anomalous_only(masks_np, maps)

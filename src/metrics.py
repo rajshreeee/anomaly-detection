@@ -1,44 +1,20 @@
-# src/metrics.py
-
 import logging
 from typing import List, Tuple
 
 import numpy as np
-from sklearn.metrics import roc_auc_score, roc_curve
+from sklearn.metrics import roc_auc_score
 
 logger = logging.getLogger(__name__)
 
-
-# ─────────────────────────────────────────────
-#  Image-level
-# ─────────────────────────────────────────────
-
 def image_auroc(y_true: List[int], scores: List[float]) -> float:
-    """
-    Image-level AUROC.
-    y_true : 0 = good, 1 = anomaly
-    scores : max anomaly map value per image (higher = more anomalous)
-    """
     auc = roc_auc_score(y_true, scores)
     logger.info(f"Image AUROC: {auc*100:.2f}%")
     return auc
-
-
-# ─────────────────────────────────────────────
-#  Pixel-level
-# ─────────────────────────────────────────────
 
 def pixel_auroc(
     masks_gt:  List[np.ndarray],
     maps_pred: List[np.ndarray],
 ) -> float:
-    """
-    Full pixel-level AUROC — computed over ALL test images including good ones.
-    Good images contribute true-negative pixels (mask=0, score=low).
-
-    masks_gt  : list of binary [H, W] arrays (0=normal, 1=defect)
-    maps_pred : list of float  [H, W] anomaly score maps
-    """
     flat_gt   = np.concatenate([m.flatten() for m in masks_gt])
     flat_pred = np.concatenate([m.flatten() for m in maps_pred])
     auc = roc_auc_score(flat_gt, flat_pred)
@@ -50,11 +26,6 @@ def pixel_auroc_anomalous_only(
     masks_gt:  List[np.ndarray],
     maps_pred: List[np.ndarray],
 ) -> float:
-    """
-    Pixel AUROC computed ONLY on images that actually contain a defect.
-    Mirrors the original PatchCore evaluation logic — excludes good images
-    so the metric focuses purely on localization quality, not detection.
-    """
     sel_masks = [m for m in masks_gt  if np.sum(m) > 0]
     sel_maps  = [m for m in maps_pred if True]  # filter by same indices
 
@@ -77,13 +48,6 @@ def per_class_image_auroc(
     scores:   List[float],
     classes:  List[str],
 ) -> dict:
-    """
-    Image AUROC broken down per defect class.
-    Useful for understanding which defect types a model handles well or poorly.
-    Each class is evaluated as binary: that class vs good.
-
-    classes : defect class name per image (e.g. 'cut', 'hole', 'good')
-    """
     results = {}
     defect_classes = [c for c in set(classes) if c != 'good']
     good_indices   = [i for i, c in enumerate(classes) if c == 'good']
@@ -106,10 +70,6 @@ def per_class_image_auroc(
     return results
 
 
-# ─────────────────────────────────────────────
-#  Bootstrap significance test
-# ─────────────────────────────────────────────
-
 def paired_bootstrap(
     y_true:   List[int],
     scores_a: List[float],
@@ -117,17 +77,6 @@ def paired_bootstrap(
     n_iter:   int = 10000,
     seed:     int = 42,
 ) -> Tuple[float, float]:
-    """
-    Paired bootstrap test for AUROC difference between two models.
-
-    H0: both models have equal image-level AUROC.
-    Resamples with replacement n_iter times, measures how often the
-    bootstrap difference >= the observed difference.
-
-    Returns:
-        p_value      : fraction of bootstrap samples where diff >= observed
-        observed_diff: absolute AUROC difference on full test set
-    """
     rng  = np.random.default_rng(seed)
     y    = np.array(y_true)
     sa   = np.array(scores_a)
@@ -148,15 +97,7 @@ def paired_bootstrap(
     return p_value, observed_diff
 
 
-# ─────────────────────────────────────────────
-#  Summary table
-# ─────────────────────────────────────────────
-
 def summarize(results: dict) -> str:
-    """
-    Pretty-print a results dict as an aligned table.
-    results = {'ModelA': {'Image AUROC': 0.95, ...}, 'ModelB': {...}}
-    """
     if not results:
         return ""
 

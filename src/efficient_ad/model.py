@@ -1,20 +1,11 @@
-# src/efficientad/model.py
-
 import logging
 import torch
-import torch.nn.functional as F
 from torch import nn
 
 logger = logging.getLogger(__name__)
 
 
 def get_pdn_small(out_channels: int = 384, padding: bool = False) -> nn.Sequential:
-    """
-    Patch Description Network (small variant).
-    Used as both teacher (out_channels=384) and student (out_channels=768).
-    Student has 2× output channels: first half mirrors teacher for ST loss,
-    second half mirrors autoencoder output for cross loss.
-    """
     p = 1 if padding else 0
     return nn.Sequential(
         nn.Conv2d(3,   128, kernel_size=4, padding=3*p), nn.ReLU(inplace=True),
@@ -27,12 +18,6 @@ def get_pdn_small(out_channels: int = 384, padding: bool = False) -> nn.Sequenti
 
 
 def get_autoencoder(out_channels: int = 384) -> nn.Sequential:
-    """
-    Convolutional autoencoder.
-    Encodes input to a bottleneck, reconstructs teacher-like feature maps.
-    Catches global/structural anomalies that patch-local student-teacher misses.
-    Dropout in decoder prevents memorization of normal textures.
-    """
     return nn.Sequential(
         # encoder
         nn.Conv2d(3,  32, 4, 2, 1), nn.ReLU(inplace=True),
@@ -61,7 +46,6 @@ def get_autoencoder(out_channels: int = 384) -> nn.Sequential:
 
 
 def load_teacher(weights_path: str, out_channels: int, device: str) -> nn.Module:
-    """Load pretrained teacher weights. Teacher is always frozen."""
     teacher = get_pdn_small(out_channels)
     state   = torch.load(weights_path, map_location='cpu')
     teacher.load_state_dict(state)
@@ -86,16 +70,6 @@ def predict_map(
     q_ae_start:  torch.Tensor,
     q_ae_end:    torch.Tensor,
 ) -> torch.Tensor:
-    """
-    Run inference for a single image batch.
-
-    Returns combined anomaly map [B, 1, H, W] with values scaled to ~[0, 0.1].
-    Higher values = more anomalous.
-
-    Two complementary signals:
-      map_st  — student fails to mimic teacher  → local texture anomalies
-      map_ae  — student fails to mimic AE output → structural/global anomalies
-    """
     t_out  = (teacher(image) - t_mean) / t_std
     s_out  = student(image)
     ae_out = autoencoder(image)
