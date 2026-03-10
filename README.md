@@ -132,19 +132,6 @@ Experiments were run on a NVIDIA A100-SXM4-40GB GPU (CUDA 12.2, Driver 535.288.0
 
 ---
 
-### Inference Benchmark
-
-| Model                | Device | Mean (ms)  | Min (ms) | Max (ms) |
-|----------------------|--------|------------|----------|----------|
-| EfficientAD          | CUDA   | **14.60**  | 14.53    | 15.00    |
-| PatchCore            | CUDA   | 380.84     | 380.30   | 381.71   |
-| EfficientAD          | CPU    | 492.62     | 474.86   | 495.80   |
-| PatchCore            | CPU    | 614.25     | 586.37   | 634.12   |
-
-EfficientAD on GPU is **26× faster** than PatchCore on GPU. Notably, EfficientAD CPU and PatchCore GPU are in the same ballpark (~490ms vs ~380ms), meaning PatchCore is effectively GPU-dependent for any real-time use.
-
----
-
 ### Observed Limitations
 **EfficientAD**
 - Misses `color` and `thread` defects more often than PatchCore 
@@ -202,13 +189,18 @@ anomaly-detection/
 ### 4. Evaluate
 
 ```bash
-python eval.py
+python src/eval.py
 ```
 
 Outputs CSVs, metric plots, and anomaly map visualizations to `results/`.
 
 ```bash
-python benchmark.py
+python src/benchmark.py
 ```
 
 Runs 100-rep inference timing (10 warmup) on all available devices and saves `results/benchmark_results.csv`.
+
+## Presentation
+
+
+ [Problem and chosen approach](anomaly-detection-ppt.pdf)
