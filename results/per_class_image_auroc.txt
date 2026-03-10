@@ -1,0 +1,7 @@
+                     EfficientAD  PatchCore
+Class                                      
+color                     0.9211     1.0000
+cut                       1.0000     1.0000
+hole                      0.9769     1.0000
+metal_contamination       1.0000     0.9685
+thread                    0.9342     0.9887

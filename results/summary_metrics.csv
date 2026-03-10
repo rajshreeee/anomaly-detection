@@ -1,0 +1,4 @@
+Metric,EfficientAD,PatchCore
+Image AUROC,0.9647,0.9916
+Full Pixel AUROC,0.957,0.9912
+Anomaly Pixel AUROC,0.962,0.9887

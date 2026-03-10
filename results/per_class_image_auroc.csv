@@ -1,0 +1,6 @@
+Class,EfficientAD,PatchCore
+color,0.9211,1.0
+cut,1.0,1.0
+hole,0.9769,1.0
+metal_contamination,1.0,0.9685
+thread,0.9342,0.9887

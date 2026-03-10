@@ -17,7 +17,7 @@ ENV/
 # --- Project Specifics ---
 # Do NOT track the raw data
 data/
-
+anamoly-detection/
 
 # --- Build & Distribution ---
 # Since you're using pip install -e .
