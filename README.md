@@ -36,7 +36,7 @@ uses a teacher-student architecture with a lightweight PDN (Patch Description Ne
 
 ---
 
-### Model Trade-offs
+#### Model Trade-offs
 
 PatchCore and EfficientAD are intentionally complementary:
 
@@ -66,7 +66,7 @@ PatchCore is the better detector out of the box; EfficientAD is the practical ch
 
 ---
 
-### EfficientAD
+#### EfficientAD
 
 - **Frozen teacher netowrk**  
   A pretrained **teacher network** remains frozen, while a **student network** is trained to mimic its outputs using normal images.
@@ -145,7 +145,7 @@ Experiments were run on a NVIDIA A100-SXM4-40GB GPU (CUDA 12.2, Driver 535.288.0
 
 ---
 
-## What Would Be Improved With More Time
+### What Would Be Improved With More Time
 
 - **Hyperparameter tuning** — coreset ratio, number of PDN training steps, learning rate schedule, and color jitter strength were set from paper defaults; a structured search (e.g. grid or Bayesian) could meaningfully improve both accuracy and speed.
 
@@ -158,20 +158,20 @@ Experiments were run on a NVIDIA A100-SXM4-40GB GPU (CUDA 12.2, Driver 535.288.0
 - **Augmentation ablation for EfficientAD** — color jitter appears to hurt `color` defect detection; testing without jitter, or restricting it to brightness/contrast only, would isolate the effect.
 
 
-## Reproduction
+### Reproduction
 
-### 1. Environment Setup
+#### 1. Environment Setup
 
 ```bash
 conda env create -f env.yml
 conda activate texture_analysis
 ```
 
-### 2. Train
+#### 2. Train
 
 Open and run `train.ipynb` — trains EfficientAD and builds the PatchCore memory bank.
 
-### 3. Pretrained Weights & Index
+#### 3. Pretrained Weights & Index
 
 To skip training, weights and embeddings are provided as follows:
 
@@ -186,7 +186,7 @@ anomaly-detection/
     └── patchcore/
         └── memory_bank.faiss
 ```
-### 4. Evaluate
+#### 4. Evaluate
 
 ```bash
 python src/eval.py
@@ -200,7 +200,7 @@ python src/benchmark.py
 
 Runs 100-rep inference timing (10 warmup) on all available devices and saves `results/benchmark_results.csv`.
 
-## Presentation
+### Presentation
 
 
  [Problem and chosen approach](anomaly-detection-ppt.pdf)
